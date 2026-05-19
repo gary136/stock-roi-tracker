@@ -1,0 +1,99 @@
+import re
+import time
+from datetime import timedelta
+
+import pandas as pd
+import requests
+import yfinance as yf
+
+BENCHMARK_TICKER = "^TWII"
+CONCURRENCY = 3
+EXPECTED_STOCK_COUNT = 300
+
+
+def _goodinfo_cookie():
+    tz_offset = -480  # UTC+8
+    day_val = time.time() / 86400 - tz_offset / 1440
+    return f"2.3|43102.1607891414|46435.4941224747|{tz_offset}|{day_val}|{day_val}"
+
+
+def _strip_tags(s):
+    return re.sub(r'<[^>]+>', '', s).replace('\xa0', '').strip()
+
+
+def _compute_roi(prices, divs_sum):
+    if prices is None or len(prices) < 2:
+        return None
+    return (float(prices.iloc[-1]) - float(prices.iloc[0]) + float(divs_sum)) / float(prices.iloc[0]) * 100
+
+
+def _fetch_top300():
+    sess = requests.Session()
+    sess.headers.update({
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "Accept-Language": "zh-TW,zh;q=0.9",
+        "Referer": "https://goodinfo.tw/tw/StockList.asp",
+    })
+    sess.cookies.set("CLIENT_KEY", _goodinfo_cookie(), domain="goodinfo.tw")
+
+    r = sess.get(
+        "https://goodinfo.tw/tw/StockList.asp"
+        "?STEP=DATA"
+        "&MARKET_CAT=%E7%86%B1%E9%96%80%E6%8E%92%E8%A1%8C"
+        "&INDUSTRY_CAT=%E5%85%AC%E5%8F%B8%E7%B8%BD%E5%B8%82%E5%80%BC%E6%9C%80%E9%AB%98"
+        "%40%40%E5%85%AC%E5%8F%B8%E7%B8%BD%E5%B8%82%E5%80%BC"
+        "%40%40%E5%85%AC%E5%8F%B8%E7%B8%BD%E5%B8%82%E5%80%BC%E6%9C%80%E9%AB%98"
+        "&SHEET=%E5%85%AC%E5%8F%B8%E5%9F%BA%E6%9C%AC%E8%B3%87%E6%96%99"
+        "&RPT_TIME=%E6%9C%80%E6%96%B0%E8%B3%87%E6%96%99"
+        "&RANK_RANGE=300",
+        timeout=30,
+    )
+    r.encoding = "utf-8"
+
+    stocks = []
+    for row in re.findall(r'<tr[^>]*>(.*?)</tr>', r.text, re.DOTALL):
+        cells = [_strip_tags(c) for c in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', row, re.DOTALL)]
+        if len(cells) >= 12 and cells[0].isdigit() and re.match(r'^\d{4,6}[A-Z]?$', cells[1]):
+            try:
+                market_cap = float(cells[11].replace(',', ''))
+            except ValueError:
+                market_cap = None
+            stocks.append({
+                "rank":       int(cells[0]),
+                "code":       cells[1],
+                "name":       cells[2],
+                "market":     cells[3],
+                "market_cap": market_cap,
+                "industry":   cells[20] if len(cells) > 20 else "",
+            })
+    return stocks
+
+
+def scrape():
+    return _fetch_top300()
+
+
+def fetch_stock(stock, now_utc):
+    """Return (roi_1y, roi_5y, sector) for a Taiwan stock."""
+    suffix = ".TWO" if stock.get("market") == "櫃" else ".TW"
+    ticker_str = stock["code"] + suffix
+    sector = stock.get("industry", "")
+    try:
+        obj = yf.Ticker(ticker_str)
+        hist = obj.history(period="5y", auto_adjust=True)
+        if hist.empty:
+            return None, None, sector
+        prices = hist["Close"].dropna()
+        if len(prices) < 2:
+            return None, None, sector
+
+        p_tz = prices.index.tz
+        cutoff_1y = pd.Timestamp(now_utc - timedelta(days=365)).tz_convert(p_tz)
+        cutoff_5y = pd.Timestamp(now_utc - timedelta(days=365 * 5)).tz_convert(p_tz)
+
+        p1y = prices[prices.index >= cutoff_1y]
+        p5y = prices[prices.index >= cutoff_5y]
+
+        return _compute_roi(p1y, 0), _compute_roi(p5y, 0), sector
+    except Exception:
+        return None, None, sector

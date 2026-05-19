@@ -1,0 +1,9 @@
+flask
+flask-cors
+sqlalchemy
+psycopg2-binary
+yfinance
+pandas
+requests
+python-dotenv
+gunicorn
