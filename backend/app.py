@@ -150,6 +150,113 @@ def fetch_and_store(market: str):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+# ── Index chart constants ─────────────────────────────────────────────────────
+
+MA_PERIODS = {
+    "daily":   [5, 10, 20, 60, 200],
+    "weekly":  [5, 10, 20, 60, 120],
+    "monthly": [5, 10, 20, 60, 120],
+}
+PERIOD_MAP   = {"daily": "1y",  "weekly": "5y",  "monthly": "max"}
+INTERVAL_MAP = {"daily": "1d",  "weekly": "1wk", "monthly": "1mo"}
+
+
+# ── Index chart route ─────────────────────────────────────────────────────────
+
+@app.route("/api/index/<ticker>/chart")
+def index_chart(ticker):
+    from flask import request
+    interval = request.args.get("interval", "daily")
+    if interval not in MA_PERIODS:
+        return jsonify({"error": "invalid interval"}), 400
+    try:
+        df = yf.download(
+            ticker,
+            period=PERIOD_MAP[interval],
+            interval=INTERVAL_MAP[interval],
+            auto_adjust=True,
+            progress=False,
+            multi_level_index=False,
+        )
+        if df.empty:
+            return jsonify({"error": "no data"}), 404
+
+        df = df.dropna(subset=["Close"])
+        close = df["Close"]
+        vol   = df["Volume"]
+
+        last = float(close.iloc[-1])
+        prev = float(close.iloc[-2]) if len(close) >= 2 else last
+        periods = MA_PERIODS[interval]
+
+        # MAs and bias Z-scores
+        mas, bias = {}, {}
+        for n in periods:
+            ma_series  = close.rolling(n).mean()
+            std_series = close.rolling(n).std()
+            mas[n] = ma_series
+            ma_val  = ma_series.iloc[-1]
+            std_val = std_series.iloc[-1]
+            if pd.notna(ma_val) and pd.notna(std_val) and float(std_val) != 0:
+                bias[n] = round((last - float(ma_val)) / float(std_val), 2)
+            else:
+                bias[n] = None
+
+        # Volume Z-score (20-period) — null-safe for pure index tickers
+        vol_mean = vol.rolling(20).mean().iloc[-1]
+        vol_std  = vol.rolling(20).std().iloc[-1]
+        if pd.notna(vol_std) and float(vol_std) != 0:
+            vol_z = round((float(vol.iloc[-1]) - float(vol_mean)) / float(vol_std), 2)
+        else:
+            vol_z = None
+
+        # OBV direction — null-safe
+        if vol_z is not None:
+            direction = close.diff().apply(lambda x: 1 if x > 0 else (-1 if x < 0 else 0))
+            obv = (vol * direction).cumsum()
+            obv_dir = "up" if len(obv) >= 15 and float(obv.iloc[-1]) > float(obv.iloc[-15]) else "down"
+        else:
+            obv_dir = None
+
+        tail = df.tail(15)
+        candles = [
+            {
+                "time":   str(idx.date()),
+                "open":   round(float(row["Open"]),   2),
+                "high":   round(float(row["High"]),   2),
+                "low":    round(float(row["Low"]),    2),
+                "close":  round(float(row["Close"]),  2),
+                "volume": int(row["Volume"]),
+            }
+            for idx, row in tail.iterrows()
+        ]
+
+        ma_out = {}
+        for n in periods:
+            series = mas[n].tail(15).dropna()
+            ma_out[str(n)] = [
+                {"time": str(i.date()), "value": round(float(v), 2)}
+                for i, v in series.items()
+            ]
+
+        return jsonify({
+            "ticker":   ticker,
+            "interval": interval,
+            "current": {
+                "price":      round(last, 2),
+                "change":     round(last - prev, 2),
+                "change_pct": round((last - prev) / prev * 100, 2) if prev else None,
+            },
+            "candles": candles,
+            "ma":      ma_out,
+            "bias":    {str(n): v for n, v in bias.items()},
+            "volume":  {"z_score": vol_z, "obv_direction": obv_dir},
+        })
+    except Exception as e:
+        app.logger.exception(f"index_chart({ticker}) error")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/<market>/status")
 def status(market):
     if market not in _MARKETS:
@@ -240,4 +347,4 @@ def refresh(market):
 
 if __name__ == "__main__":
     os.makedirs("data", exist_ok=True)
-    app.run(host="0.0.0.0", port=5003, debug=True)
+    app.run(host="0.0.0.0", port=5001, debug=True)
