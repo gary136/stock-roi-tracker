@@ -55,7 +55,7 @@ const IndexRow: React.FC<Props> = ({ ticker, name }) => {
     const container = chartContainerRef.current;
     const chart = createChart(container, {
       width: container.clientWidth,
-      height: 260,
+      height: 200,
       layout: { background: { type: ColorType.Solid, color: '#ffffff' }, textColor: '#374151' },
       grid: { vertLines: { color: '#F3F4F6' }, horzLines: { color: '#F3F4F6' } },
       timeScale: { borderColor: '#E5E7EB' },
@@ -164,18 +164,14 @@ const IndexRow: React.FC<Props> = ({ ticker, name }) => {
       <div className="flex gap-4">
         {/* Bias Z-score bars */}
         {data && maPeriods.length > 0 && (
-          <div className="w-64 flex-shrink-0 flex flex-col gap-1 justify-center">
+          <div className="w-[28%] flex-shrink-0 flex flex-col gap-1 justify-center">
             <div className="text-xs text-gray-400 mb-1">Bias vs MA (Z-score)</div>
             {maPeriods.map(period => {
               const z = data.bias[period];
               const pct = z === null ? 0 : Math.min(Math.abs(z) / 3, 1) * 50;
-              const maVal = data.ma[period]?.slice(-1)[0]?.value;
               return (
                 <div key={period} className="flex items-center gap-2 text-xs">
                   <span className="w-10 text-right text-gray-500 font-mono">{period}MA</span>
-                  <span className="w-16 text-right text-gray-400 font-mono text-xs">
-                    {maVal != null ? maVal.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}
-                  </span>
                   <div className="flex-1 relative h-3 bg-gray-100 rounded overflow-hidden">
                     <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300" />
                     {z !== null && (
@@ -197,7 +193,7 @@ const IndexRow: React.FC<Props> = ({ ticker, name }) => {
         )}
 
         {/* Chart */}
-        <div className="flex-1 min-w-0">
+        <div className="w-[72%] min-w-0">
           {loading && <div className="h-64 flex items-center justify-center text-gray-400 text-sm">Loading chart...</div>}
           {error && <div className="h-64 flex items-center justify-center text-red-500 text-sm">{error}</div>}
           {!loading && !error && (
