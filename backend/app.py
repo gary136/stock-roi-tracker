@@ -218,7 +218,7 @@ def index_chart(ticker):
         else:
             obv_dir = None
 
-        tail = df.tail(15)
+        tail = df.tail(60)
         candles = [
             {
                 "time":   str(idx.date()),
@@ -233,7 +233,7 @@ def index_chart(ticker):
 
         ma_out = {}
         for n in periods:
-            series = mas[n].tail(15).dropna()
+            series = mas[n].tail(60).dropna()
             ma_out[str(n)] = [
                 {"time": str(i.date()), "value": round(float(v), 2)}
                 for i, v in series.items()

@@ -6,6 +6,7 @@ const MarketNav: React.FC = () => (
     {[
       { to: '/taiwan', label: 'Taiwan' },
       { to: '/us', label: 'United States' },
+      { to: '/indices', label: 'Indices' },
     ].map(({ to, label }) => (
       <NavLink
         key={to}
