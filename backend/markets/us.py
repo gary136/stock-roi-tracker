@@ -69,8 +69,17 @@ def scrape():
     return _fetch_top700()
 
 
+def _empty(sector):
+    return {
+        "roi_1y": None, "roi_5y": None, "sector": sector,
+        "roi_1m": None, "roi_3m": None, "roi_6m": None,
+        "bias_5ma_z": None, "bias_20ma_z": None,
+        "vol_z": None, "ticker_yf": "",
+    }
+
+
 def fetch_stock(stock, now_utc):
-    """Return (roi_1y, roi_5y, sector) for a US stock."""
+    """Return dict with roi/bias metrics for a US stock."""
     ticker_str = stock["code"]
     try:
         obj = yf.Ticker(ticker_str)
@@ -78,18 +87,41 @@ def fetch_stock(stock, now_utc):
 
         hist = obj.history(period="5y", auto_adjust=True)
         if hist.empty:
-            return None, None, sector
+            return _empty(sector)
         prices = hist["Close"].dropna()
         if len(prices) < 2:
-            return None, None, sector
+            return _empty(sector)
 
         p_tz = prices.index.tz
         cutoff_1y = pd.Timestamp(now_utc - timedelta(days=365)).tz_convert(p_tz)
         cutoff_5y = pd.Timestamp(now_utc - timedelta(days=365 * 5)).tz_convert(p_tz)
+        cutoff_1m = pd.Timestamp(now_utc - timedelta(days=30)).tz_convert(p_tz)
+        cutoff_3m = pd.Timestamp(now_utc - timedelta(days=91)).tz_convert(p_tz)
+        cutoff_6m = pd.Timestamp(now_utc - timedelta(days=182)).tz_convert(p_tz)
 
-        p1y = prices[prices.index >= cutoff_1y]
-        p5y = prices[prices.index >= cutoff_5y]
-
-        return _compute_roi(p1y, 0), _compute_roi(p5y, 0), sector
+        last = float(prices.iloc[-1])
+        result = {
+            "roi_1y":     _compute_roi(prices[prices.index >= cutoff_1y], 0),
+            "roi_5y":     _compute_roi(prices[prices.index >= cutoff_5y], 0),
+            "roi_1m":     _compute_roi(prices[prices.index >= cutoff_1m], 0),
+            "roi_3m":     _compute_roi(prices[prices.index >= cutoff_3m], 0),
+            "roi_6m":     _compute_roi(prices[prices.index >= cutoff_6m], 0),
+            "sector":     sector,
+            "ticker_yf":  ticker_str,
+            "bias_5ma_z": None, "bias_20ma_z": None,
+            "vol_z":      None,
+        }
+        for n, key in [(5, "bias_5ma_z"), (20, "bias_20ma_z")]:
+            ma  = prices.rolling(n).mean().iloc[-1]
+            std = prices.rolling(n).std().iloc[-1]
+            if pd.notna(std) and float(std) != 0:
+                result[key] = round((last - float(ma)) / float(std), 2)
+        vol = hist["Volume"].dropna()
+        if len(vol) >= 20:
+            vol_mean = vol.rolling(20).mean().iloc[-1]
+            vol_std  = vol.rolling(20).std().iloc[-1]
+            if pd.notna(vol_std) and float(vol_std) != 0:
+                result["vol_z"] = round((float(vol.iloc[-1]) - float(vol_mean)) / float(vol_std), 2)
+        return result
     except Exception:
-        return None, None, ""
+        return _empty(sector)

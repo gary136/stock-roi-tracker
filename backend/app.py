@@ -8,7 +8,7 @@ import yfinance as yf
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, create_engine
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session
 
 from markets import taiwan, us
@@ -39,6 +39,7 @@ class Snapshot(Base):
     captured_at  = Column(DateTime(timezone=True), nullable=False)
     benchmark_1y = Column(Float, nullable=True)
     benchmark_5y = Column(Float, nullable=True)
+    benchmark_6m = Column(Float, nullable=True)
     status       = Column(String, nullable=True, default="complete")  # "in_progress" | "complete"
 
 
@@ -52,10 +53,36 @@ class StockData(Base):
     market_cap_rank = Column(Integer, nullable=True)
     roi_1y          = Column(Float, nullable=True)
     roi_5y          = Column(Float, nullable=True)
+    roi_1m          = Column(Float, nullable=True)
+    roi_3m          = Column(Float, nullable=True)
+    roi_6m          = Column(Float, nullable=True)
+    bias_5ma_z      = Column(Float, nullable=True)
+    bias_20ma_z     = Column(Float, nullable=True)
+    vol_z           = Column(Float, nullable=True)
+    ticker_yf       = Column(String, nullable=True)
     industry        = Column(String, nullable=True)
 
 
 Base.metadata.create_all(engine)
+
+# ── DB migration for existing SQLite databases ────────────────────────────────
+
+with engine.connect() as _conn:
+    for _ddl in [
+        "ALTER TABLE snapshots ADD COLUMN benchmark_6m FLOAT",
+        "ALTER TABLE stock_data ADD COLUMN roi_1m FLOAT",
+        "ALTER TABLE stock_data ADD COLUMN roi_3m FLOAT",
+        "ALTER TABLE stock_data ADD COLUMN roi_6m FLOAT",
+        "ALTER TABLE stock_data ADD COLUMN bias_5ma_z FLOAT",
+        "ALTER TABLE stock_data ADD COLUMN bias_20ma_z FLOAT",
+        "ALTER TABLE stock_data ADD COLUMN vol_z FLOAT",
+        "ALTER TABLE stock_data ADD COLUMN ticker_yf VARCHAR",
+    ]:
+        try:
+            _conn.execute(text(_ddl))
+            _conn.commit()
+        except Exception:
+            pass
 
 
 # ── Per-market concurrency control ────────────────────────────────────────────
@@ -88,6 +115,7 @@ def fetch_and_store(market: str):
 
     bench_1y = float((bench.iloc[-1] - bench.iloc[-252]) / bench.iloc[-252] * 100)
     bench_5y = float((bench.iloc[-1] - bench.iloc[0])   / bench.iloc[0]   * 100)
+    bench_6m = float((bench.iloc[-1] - bench.iloc[-126]) / bench.iloc[-126] * 100) if len(bench) > 126 else None
     app.logger.info(f"fetch_and_store({market}): benchmark 1Y={bench_1y:.2f}% 5Y={bench_5y:.2f}%")
 
     now_utc = datetime.now(timezone.utc)
@@ -99,6 +127,7 @@ def fetch_and_store(market: str):
             captured_at=now_utc,
             benchmark_1y=bench_1y,
             benchmark_5y=bench_5y,
+            benchmark_6m=bench_6m,
             status="in_progress",
         )
         session.add(snap)
@@ -115,16 +144,23 @@ def fetch_and_store(market: str):
         futures = {executor.submit(mod.fetch_stock, s, now_utc): s for s in stocks}
         for future in as_completed(futures):
             s = futures[future]
-            roi_1y, roi_5y, sector = future.result()
+            r = future.result()
             batch.append(StockData(
                 snapshot_id=snap_id,
                 code=s["code"],
                 name=s["name"],
                 market_cap=s["market_cap"],
                 market_cap_rank=s["rank"],
-                roi_1y=roi_1y,
-                roi_5y=roi_5y,
-                industry=sector,
+                roi_1y=r["roi_1y"],
+                roi_5y=r["roi_5y"],
+                roi_1m=r["roi_1m"],
+                roi_3m=r["roi_3m"],
+                roi_6m=r["roi_6m"],
+                bias_5ma_z=r["bias_5ma_z"],
+                bias_20ma_z=r["bias_20ma_z"],
+                vol_z=r["vol_z"],
+                ticker_yf=r["ticker_yf"],
+                industry=r["sector"],
             ))
             completed += 1
             if len(batch) >= 50:
@@ -299,18 +335,26 @@ def data(market):
                 "benchmark": {
                     "roi_1y": snap.benchmark_1y,
                     "roi_5y": snap.benchmark_5y,
+                    "roi_6m": snap.benchmark_6m,
                 },
                 "captured_at": snap.captured_at.isoformat(),
                 "is_complete":  is_complete,
                 "stocks": [
                     {
-                        "rank":       r.market_cap_rank,
-                        "code":       r.code,
-                        "name":       r.name,
-                        "market_cap": r.market_cap,
-                        "roi_1y":     r.roi_1y,
-                        "roi_5y":     r.roi_5y,
-                        "industry":   r.industry,
+                        "rank":        r.market_cap_rank,
+                        "code":        r.code,
+                        "name":        r.name,
+                        "market_cap":  r.market_cap,
+                        "roi_1y":      r.roi_1y,
+                        "roi_5y":      r.roi_5y,
+                        "roi_1m":      r.roi_1m,
+                        "roi_3m":      r.roi_3m,
+                        "roi_6m":      r.roi_6m,
+                        "bias_5ma_z":  r.bias_5ma_z,
+                        "bias_20ma_z": r.bias_20ma_z,
+                        "vol_z":       r.vol_z,
+                        "ticker_yf":   r.ticker_yf,
+                        "industry":    r.industry,
                     }
                     for r in rows
                 ],
