@@ -8,7 +8,7 @@ interface Props {
   config: MarketConfig;
 }
 
-type SortKey = 'rank' | 'roi_1y' | 'roi_5y' | 'market_cap';
+type SortKey = 'rank' | 'roi_1y' | 'roi_5y' | 'market_cap' | 'vol_z' | 'bias_5ma_z' | 'bias_20ma_z' | 'roi_1m' | 'roi_3m' | 'roi_6m';
 type View = 'long' | 'short';
 
 function fmtRoi(v: number | null | undefined, beats: boolean) {
@@ -23,13 +23,9 @@ function fmtRoi(v: number | null | undefined, beats: boolean) {
 }
 
 function fmtZ(v: number | null | undefined) {
-  if (v == null) return <span className="text-gray-400">—</span>;
-  const abs = Math.abs(v);
-  const color = abs >= 2
-    ? (v > 0 ? 'text-red-500' : 'text-green-600')
-    : abs >= 1 ? 'text-orange-400' : 'text-gray-500';
-  const sign = v >= 0 ? '+' : '';
-  return <span className={color}>{sign}{v.toFixed(2)}σ</span>;
+  if (v == null || Math.abs(v) < 2) return <span className="text-gray-400">—</span>;
+  const color = v > 0 ? 'text-red-500' : 'text-green-600';
+  return <span className={color}>{v > 0 ? '+' : ''}{v.toFixed(2)}σ</span>;
 }
 
 const StockTable: React.FC<Props> = ({ stocks, benchmark, config }) => {
@@ -110,7 +106,7 @@ const StockTable: React.FC<Props> = ({ stocks, benchmark, config }) => {
           Showing {visible.length} of {stocks.length} stocks
         </span>
         <div className="ml-auto flex gap-1">
-          {(['long', 'short'] as View[]).map(v => (
+          {(['short', 'long'] as View[]).map(v => (
             <button
               key={v}
               onClick={() => setView(v)}
@@ -150,12 +146,12 @@ const StockTable: React.FC<Props> = ({ stocks, benchmark, config }) => {
                 </>
               ) : (
                 <>
-                  <th className="px-4 py-3 text-right">Vol Bias</th>
-                  <th className="px-4 py-3 text-right">5MA Bias</th>
-                  <th className="px-4 py-3 text-right">20MA Bias</th>
-                  <th className="px-4 py-3 text-right">1M ROI</th>
-                  <th className="px-4 py-3 text-right">3M ROI</th>
-                  <th className="px-4 py-3 text-right">6M ROI</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-gray-100 select-none" onClick={() => toggleSort('vol_z')}>Vol Bias{sortIcon('vol_z')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-gray-100 select-none" onClick={() => toggleSort('bias_5ma_z')}>5MA Bias{sortIcon('bias_5ma_z')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-gray-100 select-none" onClick={() => toggleSort('bias_20ma_z')}>20MA Bias{sortIcon('bias_20ma_z')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-gray-100 select-none" onClick={() => toggleSort('roi_1m')}>1M ROI{sortIcon('roi_1m')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-gray-100 select-none" onClick={() => toggleSort('roi_3m')}>3M ROI{sortIcon('roi_3m')}</th>
+                  <th className="px-4 py-3 text-right cursor-pointer hover:bg-gray-100 select-none" onClick={() => toggleSort('roi_6m')}>6M ROI{sortIcon('roi_6m')}</th>
                   <th className="px-4 py-3"></th>
                 </>
               )}

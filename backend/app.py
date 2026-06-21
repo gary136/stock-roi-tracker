@@ -39,6 +39,8 @@ class Snapshot(Base):
     captured_at  = Column(DateTime(timezone=True), nullable=False)
     benchmark_1y = Column(Float, nullable=True)
     benchmark_5y = Column(Float, nullable=True)
+    benchmark_1m = Column(Float, nullable=True)
+    benchmark_3m = Column(Float, nullable=True)
     benchmark_6m = Column(Float, nullable=True)
     status       = Column(String, nullable=True, default="complete")  # "in_progress" | "complete"
 
@@ -69,6 +71,8 @@ Base.metadata.create_all(engine)
 
 with engine.connect() as _conn:
     for _ddl in [
+        "ALTER TABLE snapshots ADD COLUMN benchmark_1m FLOAT",
+        "ALTER TABLE snapshots ADD COLUMN benchmark_3m FLOAT",
         "ALTER TABLE snapshots ADD COLUMN benchmark_6m FLOAT",
         "ALTER TABLE stock_data ADD COLUMN roi_1m FLOAT",
         "ALTER TABLE stock_data ADD COLUMN roi_3m FLOAT",
@@ -115,6 +119,8 @@ def fetch_and_store(market: str):
 
     bench_1y = float((bench.iloc[-1] - bench.iloc[-252]) / bench.iloc[-252] * 100)
     bench_5y = float((bench.iloc[-1] - bench.iloc[0])   / bench.iloc[0]   * 100)
+    bench_1m = float((bench.iloc[-1] - bench.iloc[-21])  / bench.iloc[-21]  * 100) if len(bench) > 21  else None
+    bench_3m = float((bench.iloc[-1] - bench.iloc[-63])  / bench.iloc[-63]  * 100) if len(bench) > 63  else None
     bench_6m = float((bench.iloc[-1] - bench.iloc[-126]) / bench.iloc[-126] * 100) if len(bench) > 126 else None
     app.logger.info(f"fetch_and_store({market}): benchmark 1Y={bench_1y:.2f}% 5Y={bench_5y:.2f}%")
 
@@ -127,6 +133,8 @@ def fetch_and_store(market: str):
             captured_at=now_utc,
             benchmark_1y=bench_1y,
             benchmark_5y=bench_5y,
+            benchmark_1m=bench_1m,
+            benchmark_3m=bench_3m,
             benchmark_6m=bench_6m,
             status="in_progress",
         )
@@ -335,6 +343,8 @@ def data(market):
                 "benchmark": {
                     "roi_1y": snap.benchmark_1y,
                     "roi_5y": snap.benchmark_5y,
+                    "roi_1m": snap.benchmark_1m,
+                    "roi_3m": snap.benchmark_3m,
                     "roi_6m": snap.benchmark_6m,
                 },
                 "captured_at": snap.captured_at.isoformat(),

@@ -20,6 +20,8 @@ export interface Stock {
 export interface Benchmark {
   roi_1y: number;
   roi_5y: number;
+  roi_1m?: number | null;
+  roi_3m?: number | null;
   roi_6m?: number | null;
 }
 
