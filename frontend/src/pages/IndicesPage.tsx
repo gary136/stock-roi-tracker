@@ -10,6 +10,10 @@ const ROW_GROUPS = [
     { ticker: '^TWII', name: 'Taiwan Weighted Index' },
     { ticker: '^GSPC', name: 'S&P 500' },
   ],
+  [
+    { ticker: '^N225', name: 'Nikkei 225' },
+    { ticker: '^KS11', name: 'KOSPI' },
+  ],
 ];
 
 const IndicesPage: React.FC = () => (
