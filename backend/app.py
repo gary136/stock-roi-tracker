@@ -16,12 +16,16 @@ from markets import taiwan, us
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=[
-    "http://localhost:3000",
-    os.getenv("FRONTEND_URL", ""),
-])
+_origins = ["http://localhost:3000"]
+if os.getenv("FRONTEND_URL"):
+    _origins.append(os.getenv("FRONTEND_URL"))
+CORS(app, origins=_origins)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/stock_roi.db")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+if DATABASE_URL.startswith("sqlite"):
+    os.makedirs("data", exist_ok=True)
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
@@ -85,8 +89,8 @@ with engine.connect() as _conn:
         try:
             _conn.execute(text(_ddl))
             _conn.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            app.logger.debug(f"Migration skipped: {e}")
 
 
 # ── Per-market concurrency control ────────────────────────────────────────────
@@ -400,5 +404,4 @@ def refresh(market):
 
 
 if __name__ == "__main__":
-    os.makedirs("data", exist_ok=True)
     app.run(host="0.0.0.0", port=5001, debug=True)
