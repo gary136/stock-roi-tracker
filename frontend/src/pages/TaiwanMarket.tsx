@@ -28,6 +28,7 @@ function formatDate(iso: string | null) {
 
 const TaiwanMarket: React.FC = () => {
   const { data, loading, error, refreshing, refresh } = useStockData('tw');
+  const isDev = process.env.NODE_ENV === 'development';
 
   return (
     <div>
@@ -35,8 +36,8 @@ const TaiwanMarket: React.FC = () => {
         title={config.title}
         subtitle={config.subtitle}
         lastUpdated={formatDate(data?.captured_at ?? null)}
-        onRefresh={refresh}
-        isRefreshing={refreshing}
+        onRefresh={isDev ? refresh : undefined}
+        isRefreshing={isDev ? refreshing : undefined}
       />
       <main className="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-6">
         {loading && (
@@ -56,8 +57,9 @@ const TaiwanMarket: React.FC = () => {
           <div className="text-center py-16 text-gray-500">
             <p className="text-lg font-medium">No data yet.</p>
             <p className="text-sm mt-1">
-              Click <strong>Refresh Data</strong> to fetch the latest Taiwan stock ROI data.
-              This takes about {config.refreshNote}.
+              {isDev
+                ? <>Click <strong>Refresh Data</strong> to fetch the latest Taiwan stock ROI data. This takes about {config.refreshNote}.</>
+                : 'Data is updated daily. Check back soon.'}
             </p>
           </div>
         )}

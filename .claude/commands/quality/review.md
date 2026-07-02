@@ -1,4 +1,4 @@
-Review the code described or shown above against taiwan-roi-tracker project conventions.
+Review the code described or shown above against stock-roi-tracker project conventions.
 
 This is a read-only review — suggest changes, do not apply them unless asked.
 
