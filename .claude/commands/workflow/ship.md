@@ -107,12 +107,12 @@ Read the **Status** field and **Decision** in § 5.
 
 ---
 
-## Stage 4 — Implement with approval
+## Stage 4 — Implement autonomously
 
-Follow the instructions in `workflow:implement-review` exactly.
+Follow the instructions in `workflow:implement` exactly.
 
 - The plan is already approved — do not re-check.
-- For each phase, run: implement → build/test → present → wait for user approval → commit → log.
+- For each phase, run: implement → build/test → simulate review → commit → log. Proceed immediately to the next phase without stopping for user approval.
 - Fill in § 6 (Implementation Log) after each phase commit.
 - Fill in § 7 (Final Verification) after all phases.
 - Set **Status** to `Complete`.
