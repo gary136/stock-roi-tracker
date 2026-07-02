@@ -49,7 +49,7 @@ Do NOT apply a fix until the root cause is confirmed.
 ## Step 6 — Verify the Fix
 ```bash
 # Backend startup
-python app.py
+python3 app.py
 
 # Quick smoke test
 curl http://localhost:5001/api/tw/status

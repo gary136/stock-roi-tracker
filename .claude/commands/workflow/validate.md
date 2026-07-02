@@ -9,7 +9,7 @@ Run a complete validation of the current implementation against its success crit
 cd frontend && CI=true npm run build
 
 # Backend startup check
-python app.py &
+python3 app.py &
 sleep 3 && curl -s http://localhost:5001/api/tw/status | python3 -m json.tool
 kill %1
 ```
@@ -56,7 +56,7 @@ Review the changed files for:
 
 ## 5. API Smoke Tests (curl)
 
-Requires `python app.py` running locally on port 5001.
+Requires `python3 app.py` running locally on port 5001.
 
 ```bash
 # Market status
@@ -83,7 +83,7 @@ Report each result as: `✅ expected output` or `❌ unexpected — [actual outp
 ## 6. Manual Testing Steps
 
 Provide step-by-step instructions for the user to manually verify the feature:
-1. Start backend: `python app.py`
+1. Start backend: `python3 app.py`
 2. Start frontend: `cd frontend && npm start`
 3. Action steps with expected outcomes
 4. Edge cases to check

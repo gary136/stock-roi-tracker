@@ -14,7 +14,7 @@ State these BEFORE writing any code:
 - [ ] [what must work]
 ### Technical Requirements
 - [ ] CI=true npm run build succeeds (frontend)
-- [ ] python app.py starts without errors (backend)
+- [ ] python3 app.py starts without errors (backend)
 - [ ] No TypeScript errors
 ### Acceptance Conditions
 - [ ] [measurable condition]
@@ -33,7 +33,7 @@ State these BEFORE writing any code:
 cd frontend && CI=true npm run build
 
 # Backend
-python app.py   # confirm no startup errors, then Ctrl+C
+python3 app.py   # confirm no startup errors, then Ctrl+C
 
 # Quick API smoke test
 curl http://localhost:5001/api/tw/status

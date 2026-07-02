@@ -9,8 +9,10 @@ Write tests for the code described or shown above.
 | React component | `frontend/src/components/__tests__/[Name].test.tsx` | Jest + React Testing Library |
 | Custom hook | `frontend/src/hooks/__tests__/use[Name].test.ts` | Jest + `renderHook` |
 | Utility function | `frontend/src/utils/__tests__/[name].test.ts` | Jest |
-| Flask route | `backend/tests/test_[name].py` | pytest |
+| Flask route | `backend/tests/test_[name].py` | pytest (run `pip install pytest` first) |
 | Market scraper / fetcher | `backend/tests/test_markets.py` | pytest + mocked yfinance |
+
+Note: `backend/tests/` exists but is empty — create test files as needed. No pytest suite is configured yet.
 
 ---
 
