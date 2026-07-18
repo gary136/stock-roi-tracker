@@ -403,5 +403,41 @@ def refresh(market):
     return jsonify({"status": "started"})
 
 
+# ── Daily auto-update scheduler ───────────────────────────────────────────────
+
+def _scheduled_fetch(market: str):
+    with _fetch_lock[market]:
+        if _fetch_running[market]:
+            app.logger.info(f"_scheduled_fetch({market}): fetch already running — skipping")
+            return
+        _fetch_running[market] = True
+
+    def run():
+        try:
+            fetch_and_store(market)
+        except Exception:
+            app.logger.exception(f"_scheduled_fetch({market}) failed")
+        finally:
+            _fetch_running[market] = False
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+# Gunicorn imports this module as "app"; `python app.py` runs it as "__main__",
+# where the scheduler must not start (app.debug is only set inside app.run below,
+# so it cannot gate this on its own at import time).
+if __name__ != "__main__" and not app.debug:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
+
+    _scheduler = BackgroundScheduler(timezone="UTC")
+    _scheduler.add_job(_scheduled_fetch, CronTrigger(hour=6, minute=0, timezone="UTC"),
+                       args=["tw"], id="daily_tw", replace_existing=True)
+    _scheduler.add_job(_scheduled_fetch, CronTrigger(hour=22, minute=0, timezone="UTC"),
+                       args=["us"], id="daily_us", replace_existing=True)
+    _scheduler.start()
+    app.logger.info("Scheduler started: tw@06:00 UTC, us@22:00 UTC")
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001, debug=True)
