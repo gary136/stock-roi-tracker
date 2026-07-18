@@ -1,6 +1,6 @@
 # Task: Railway + Vercel Deployment
 
-**Status**: Approved with changes
+**Status**: Implementation complete — deployment steps pending (see § 7)
 **Created**: 2026-06-30
 **Branch**: main
 
@@ -214,87 +214,98 @@ Daily auto-update:
 *(implementation agent fills this section — one entry per phase, after commit)*
 
 ### Phase 1 — Fix gunicorn entry point
-**Status**: [ ] Pending  [ ] In Progress  [ ] Complete
-**Commit**: ``
+**Status**: [x] Complete
+**Commit**: `3eb833d`
 **Files changed**:
--
+- `backend/railway.toml`, `backend/Procfile`
 
 **Build / test results**:
-- Backend startup: pass / fail
-- Build: pass / fail
+- Backend startup: pass
 
 **Success criteria**:
-- [ ] Railway service starts and passes health check ✅/❌
+- [x] Railway service starts and passes health check ✅ — verified live 2026-07-18: `GET /api/tw/status` on `stock-roi-tracker-production.up.railway.app` returns 200 JSON
 
-**Notes**:
+**Notes**: Log backfilled 2026-07-18 — phase was implemented and deployed earlier but not logged.
 
 ---
 
 ### Phase 2 — Fix app.py for production
-**Status**: [ ] Pending  [ ] In Progress  [ ] Complete
-**Commit**: ``
+**Status**: [x] Complete
+**Commit**: `08da43e`
 **Files changed**:
--
+- `backend/app.py`
 
 **Build / test results**:
-- Backend startup: pass / fail
+- Backend startup: pass
 
 **Success criteria**:
-- [ ] No ValueError on `postgres://` URL ✅/❌
-- [ ] CORS origins has no empty string ✅/❌
+- [x] No ValueError on `postgres://` URL ✅ (`app.py:25-26`)
+- [x] CORS origins has no empty string ✅ (`app.py:20-21` — appended only if set)
 
-**Notes**:
+**Notes**: Log backfilled 2026-07-18. Live Railway service starts and serves routes.
 
 ---
 
 ### Phase 3 — Hide Refresh button in production
-**Status**: [ ] Pending  [ ] In Progress  [ ] Complete
-**Commit**: ``
+**Status**: [x] Complete
+**Commit**: `3eb833d` (with follow-ups on main)
 **Files changed**:
--
+- `frontend/src/components/common/Header.tsx`, `frontend/src/pages/TaiwanMarket.tsx`, `frontend/src/pages/UsMarket.tsx`, `frontend/vercel.json`
 
 **Build / test results**:
-- Frontend build: pass / fail
+- Frontend build: pass (at implementation time)
 
 **Success criteria**:
-- [ ] Button visible in dev (`npm start`) ✅/❌
-- [ ] Button absent in production build ✅/❌
-- [ ] "No data yet" message correct in production ✅/❌
+- [x] Button visible in dev (`npm start`) ✅ — `onRefresh={isDev ? refresh : undefined}`
+- [x] Button absent in production build ✅ — `Header` renders button only when `onRefresh` defined
+- [ ] "No data yet" message correct in production — not re-verified during backfill
 
-**Notes**:
+**Notes**: Log backfilled 2026-07-18. Cannot be verified end-to-end in prod until Vercel deploy exists.
 
 ---
 
 ### Phase 4 — Daily auto-update via APScheduler
-**Status**: [ ] Pending  [ ] In Progress  [ ] Complete
-**Commit**: ``
+**Status**: [x] Complete
+**Commit**: `180e28b`
 **Files changed**:
--
+- `backend/app.py` — `_scheduled_fetch()` + guarded `BackgroundScheduler` block
+- `backend/requirements.txt` — added `apscheduler`
 
 **Build / test results**:
-- Backend startup: pass / fail
+- Backend startup: pass — `python3 app.py` runs module-level code cleanly with no scheduler started
 
 **Success criteria**:
-- [ ] No scheduler in local dev (debug=True) ✅/❌
-- [ ] Scheduler registered in production mode ✅/❌
+- [x] No scheduler in local dev ✅ — gated on `__name__ != "__main__"`; dev startup log shows no scheduler line
+- [x] Scheduler registered in production mode ✅ — gunicorn-style `import app` verified: 2 jobs, `daily_tw` next run 06:00:00+00:00, `daily_us` next run 22:00:00+00:00
 
 **Notes**:
+- Plan's `not app.debug` gate is insufficient alone: `app.debug` is False at module import time even in dev (set only inside `app.run(debug=True)`). Gate changed to `__name__ != "__main__" and not app.debug` — gunicorn imports the module as `"app"`, local dev runs it as `"__main__"`.
+- Bug caught in verification: explicitly constructed `CronTrigger` ignores the scheduler's `timezone="UTC"` default and uses local time. Fixed by passing `timezone="UTC"` to each trigger; next-run times re-verified as `+00:00`.
+- `_scheduled_fetch` includes the review-mandated `finally: _fetch_running[market] = False`.
 
 ---
 
 ## 7. Final Verification
-*(implementation agent fills after all phases)*
+*(updated 2026-07-18)*
 
-- [ ] All phases complete
-- [ ] `CI=true npm run build` passes
-- [ ] Backend starts cleanly with `python app.py`
-- [ ] `docs/CONFIGURATION-REFERENCE.md` updated if config changed
+- [x] All phases complete (code-side; deployment steps below still pending)
+- [ ] `CI=true npm run build` — not re-run for Phase 4 (no frontend changes)
+- [x] Backend starts cleanly with `python app.py`
+- [ ] `docs/CONFIGURATION-REFERENCE.md` — does not exist in repo
 
 **Success criteria from § 1**:
-- [ ] Railway service starts and passes health check ✅/❌
-- [ ] App starts without crashing on `postgres://` URL ✅/❌
-- [ ] CORS allows Vercel URL only ✅/❌
-- [ ] Direct URL access to `/taiwan`, `/us`, `/indices` works ✅/❌
-- [ ] Refresh button hidden in production build ✅/❌
-- [ ] Both markets auto-refresh daily ✅/❌
-- [ ] Local dev unchanged ✅/❌
+- [x] Railway service starts and passes health check ✅ — live 200 on `/api/tw/status`, `/api/us/status` (2026-07-18)
+- [x] App starts without crashing on `postgres://` URL ✅ — code verified; live service runs (Postgres addon being attached 2026-07-18)
+- [ ] CORS allows Vercel URL only ❌ — pending: Vercel not yet deployed, `FRONTEND_URL` unset
+- [ ] Direct URL access to `/taiwan`, `/us`, `/indices` works ❌ — pending Vercel deploy (`vercel.json` rewrite is in place)
+- [ ] Refresh button hidden in production build ❌ — code in place; pending Vercel deploy to verify
+- [ ] Both markets auto-refresh daily ❌ — code in place (commit `180e28b`); pending push + Railway deploy, then verify first cron firing in Railway logs
+- [x] Local dev unchanged ✅ — dev startup has no scheduler; Refresh button still dev-gated
+
+**Remaining deployment steps** (infra, not code):
+1. Attach Railway PostgreSQL addon + `DATABASE_URL` reference variable
+2. Push `180e28b` → Railway auto-deploys scheduler
+3. Trigger initial data fetch (`POST /api/<market>/refresh`) or wait for first cron
+4. Deploy frontend to Vercel (root `frontend/`, `REACT_APP_API_URL=https://stock-roi-tracker-production.up.railway.app`)
+5. Set `FRONTEND_URL` on Railway to the Vercel URL
+6. Verify remaining ❌ items above
