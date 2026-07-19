@@ -1,6 +1,6 @@
 # Task: Railway + Vercel Deployment
 
-**Status**: Implementation complete — deployment steps pending (see § 7)
+**Status**: Complete — live in production 2026-07-19
 **Created**: 2026-06-30
 **Branch**: main
 
@@ -293,19 +293,19 @@ Daily auto-update:
 - [x] Backend starts cleanly with `python app.py`
 - [ ] `docs/CONFIGURATION-REFERENCE.md` — does not exist in repo
 
-**Success criteria from § 1**:
-- [x] Railway service starts and passes health check ✅ — live 200 on `/api/tw/status`, `/api/us/status` (2026-07-18)
-- [x] App starts without crashing on `postgres://` URL ✅ — code verified; live service runs (Postgres addon being attached 2026-07-18)
-- [ ] CORS allows Vercel URL only ❌ — pending: Vercel not yet deployed, `FRONTEND_URL` unset
-- [ ] Direct URL access to `/taiwan`, `/us`, `/indices` works ❌ — pending Vercel deploy (`vercel.json` rewrite is in place)
-- [ ] Refresh button hidden in production build ❌ — code in place; pending Vercel deploy to verify
-- [ ] Both markets auto-refresh daily ❌ — code in place (commit `180e28b`); pending push + Railway deploy, then verify first cron firing in Railway logs
+**Success criteria from § 1** (all verified live 2026-07-19):
+- [x] Railway service starts and passes health check ✅ — live 200 on `/api/tw/status`, `/api/us/status`
+- [x] App starts without crashing on `postgres://` URL ✅ — Postgres addon attached; data survived redeploy (persistence proven)
+- [x] CORS allows Vercel URL only ✅ — `access-control-allow-origin: https://stock-roi-tracker.vercel.app` confirmed via curl with Origin header
+- [x] Direct URL access to `/taiwan`, `/us`, `/indices` works ✅ — all three return HTTP 200 on Vercel
+- [x] Refresh button hidden in production build ✅ — deployed bundle gates on `NODE_ENV`; API URL baked in correctly
+- [x] Both markets auto-refresh daily ✅ — scheduler fired live at 22:00 UTC 2026-07-18 (US snapshot timestamped 22:00:40Z)
 - [x] Local dev unchanged ✅ — dev startup has no scheduler; Refresh button still dev-gated
 
-**Remaining deployment steps** (infra, not code):
-1. Attach Railway PostgreSQL addon + `DATABASE_URL` reference variable
-2. Push `180e28b` → Railway auto-deploys scheduler
-3. Trigger initial data fetch (`POST /api/<market>/refresh`) or wait for first cron
-4. Deploy frontend to Vercel (root `frontend/`, `REACT_APP_API_URL=https://stock-roi-tracker-production.up.railway.app`)
-5. Set `FRONTEND_URL` on Railway to the Vercel URL
-6. Verify remaining ❌ items above
+**Production URLs**:
+- Frontend: https://stock-roi-tracker.vercel.app (Vercel project `stock-roi-tracker`, CLI-deployed — not Git-connected; redeploy with `vercel --prod` from `frontend/`)
+- Backend: https://stock-roi-tracker-production.up.railway.app (Railway, auto-deploys from GitHub `main`, root `/backend`)
+
+**Post-deploy fix shipped during rollout** (commit `26103f5`): US fetch crashed partway on every run — `NameError` in `us.py` `fetch_stock` except-handler (`sector` referenced before assignment when yfinance failed early). Fixed + per-ticker exception isolation in `fetch_and_store`. First complete US snapshot: 526 stocks, 487 with ROI.
+
+**Known remaining issue (out of scope)**: US scraper returns ~526 of 700 expected stocks — `_fetch_top700()` silently skips failed pages (`except: pass` per page in `us.py`). Same behavior locally. Candidate future task.
