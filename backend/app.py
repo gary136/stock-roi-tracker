@@ -151,12 +151,19 @@ def fetch_and_store(market: str):
     total = len(stocks)
     batch = []
     completed = 0
+    failed = 0
 
     with ThreadPoolExecutor(max_workers=mod.CONCURRENCY) as executor:
         futures = {executor.submit(mod.fetch_stock, s, now_utc): s for s in stocks}
         for future in as_completed(futures):
             s = futures[future]
-            r = future.result()
+            try:
+                r = future.result()
+            except Exception:
+                app.logger.exception(f"fetch_and_store({market}): fetch_stock({s['code']}) failed — skipping")
+                failed += 1
+                completed += 1
+                continue
             batch.append(StockData(
                 snapshot_id=snap_id,
                 code=s["code"],
@@ -193,7 +200,7 @@ def fetch_and_store(market: str):
         snap = session.get(Snapshot, snap_id)
         snap.status = "complete"
         session.commit()
-    app.logger.info(f"fetch_and_store({market}): snapshot id={snap_id} complete with {completed} stocks")
+    app.logger.info(f"fetch_and_store({market}): snapshot id={snap_id} complete with {completed - failed} stocks ({failed} failed)")
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────

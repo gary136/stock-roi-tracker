@@ -81,6 +81,7 @@ def _empty(sector):
 def fetch_stock(stock, now_utc):
     """Return dict with roi/bias metrics for a US stock."""
     ticker_str = stock["code"]
+    sector = ""
     try:
         obj = yf.Ticker(ticker_str)
         sector = obj.info.get("sector") or ""
