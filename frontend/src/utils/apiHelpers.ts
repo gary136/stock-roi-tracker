@@ -1,6 +1,6 @@
 import type { MarketId } from '../types/market';
 
-const getApiBase = (): string => process.env.REACT_APP_API_URL ?? '';
+export const getApiBase = (): string => process.env.REACT_APP_API_URL ?? '';
 
 export const makeApiRequest = async <T>(
   market: MarketId,

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
+import { getApiBase } from '../utils/apiHelpers';
+
 export type Interval = 'daily' | 'weekly' | 'monthly';
 
 export interface Candle {
@@ -34,7 +36,7 @@ export function useIndexChart(ticker: string, initialInterval: Interval = 'daily
     setError(null);
     try {
       const encoded = encodeURIComponent(ticker);
-      const res = await fetch(`/api/index/${encoded}/chart?interval=${iv}`);
+      const res = await fetch(`${getApiBase()}/api/index/${encoded}/chart?interval=${iv}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: IndexChartData = await res.json();
       setData(json);
